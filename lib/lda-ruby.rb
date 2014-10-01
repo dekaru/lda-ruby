@@ -10,12 +10,14 @@ require 'lda-ruby/corpus/text_corpus'
 require 'lda-ruby/corpus/directory_corpus'
 require 'lda-ruby/vocabulary'
 
+require 'redis'
+
 module Lda
   class Lda
     attr_reader :vocab, :corpus
 
-    def initialize(corpus)
-      load_default_settings
+    def initialize corpus, n_topics = 20
+      load_default_settings n_topics
 
       @vocab = nil
       self.corpus = corpus
@@ -24,12 +26,12 @@ module Lda
       @phi = nil
     end
 
-    def load_default_settings
+    def load_default_settings n_topics = 20
       self.max_iter = 20
       self.convergence = 1e-6
       self.em_max_iter = 100
       self.em_convergence = 1e-4
-      self.num_topics = 20
+      self.num_topics = n_topics
       self.init_alpha = 0.3
       self.est_alpha = 1
 
@@ -61,16 +63,33 @@ module Lda
     #
     # See also +top_words+.
     #
-    def print_topics(words_per_topic = 10)
+    def print_topics(words_per_topic = 10, output_file = nil, redis = nil, username = nil)
       raise 'No vocabulary loaded.' unless @vocab
 
       self.beta.each_with_index do |topic, topic_num|
-        # Sort the topic array and return the sorted indices of the best scores
-        indices = (topic.zip((0...@vocab.size).to_a).sort { |i, j| i[0] <=> j[0] }.map { |i, j| j }.reverse)[0...words_per_topic]
 
-        puts "Topic #{topic_num}"
-        puts "\t#{indices.map {|i| @vocab[i]}.join("\n\t")}"
+        # Sort the topic array and return the sorted indices of the best scores
+        indices = (topic.zip((0...@vocab.size).to_a).sort { |i, j| i[0] <=> j[0] }.map { |i, j| [j , i] }.reverse)[0...words_per_topic]
+
+        puts "Topic #{topic_num}\n"
+        indices.each { |index, score| puts "\t" + score.round(5).to_s + " " + @vocab[index] }
+        # puts "\t#{indices.map {|i| @vocab[i]}.join("\n\t")}"
         puts ""
+
+        if output_file
+          output_file.puts "Topic #{topic_num}"
+          indices.each { |index, score| output_file.puts "\t" + score.round(5).to_s + " " + @vocab[index] }
+          output_file.puts ""
+        end
+        if redis
+          if username 
+            # Esto no tiene aplicación práctica y se está usando la misma variable que después se usa para calcular el tf
+            indices.each { |i, s| redis.hset "user:"+username+":words", @vocab[i], s }
+          else
+            indices.each { |i, s| redis.hset "topics:"+topic_num.to_s, @vocab[i], s }
+            indices.each { |i, s| redis.hset "words", @vocab[i], "" }
+          end
+        end
       end
 
       nil

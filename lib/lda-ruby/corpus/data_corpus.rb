@@ -2,8 +2,8 @@ module Lda
   class DataCorpus < Corpus
     attr_reader :filename
 
-    def initialize(filename)
-      super()
+    def initialize(filename, stop_words_list = nil)
+      super(stop_words_list)
 
       @filename = filename
       load_from_file

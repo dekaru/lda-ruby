@@ -3,8 +3,8 @@ module Lda
     attr_reader :path, :extension
 
     # load documents from a directory
-    def initialize(path, extension = nil)
-      super()
+    def initialize(path, extension = nil, stop_words_list = nil)
+      super(stop_words_list)
 
       @path = path.dup.freeze
       @extension = extension ? extension.dup.freeze : nil
